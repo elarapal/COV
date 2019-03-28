@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=utf-8 />
+<title>City of Vancouver - Postal Code Targeting</title>
+<meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+<script src='https://api.mapbox.com/mapbox.js/v3.2.0/mapbox.js'></script>
+<script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-draw/v0.4.10/leaflet.draw.js'></script>
+<link href='https://api.mapbox.com/mapbox.js/v3.2.0/mapbox.css' rel='stylesheet' />
+<link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-draw/v0.4.10/leaflet.draw.css' rel='stylesheet' />
+   <style>
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #export {
+            position: absolute;
+            top:18px;
+            left:40%;
+            background:white;
+            color:black;
+            padding:6px;
+            outline: 5px solid green;
+            font-family: arial;
+            font-style: bold;
+            font-weight: bold;
+            text-decoration: none; 
+            cursor: pointer;
+            font-size:11px;
+        }
+      
+        #clear {
+            position: absolute;
+            top:80px;
+            left:40%;
+            background:white;
+            color:black;
+            padding:6px;
+            outline: 5px solid red;
+            font-family: arial;
+            font-style: bold;
+            font-weight: bold;
+            text-decoration: none; 
+            cursor: pointer;
+            font-size:11px;
+        }
+
+    </style>
+</head>
+
+<body>
+<div id='map'></div>
+<a href='#' id='export'>SAVE BOUNDARY TO GEOJSON</a>
+<a href='#' id='clear'>CLEAR ALL REFERENCE POINTS</a>   
+<script>
+L.mapbox.accessToken = 'pk.eyJ1IjoiZWxhcmFwYWwiLCJhIjoiY2lwYTVrYzJtMDAxb3Nubmp4NnNwMW95cyJ9.HiRwcboZw0UpnRUrwzxVAA';
+
+var map = L.mapbox.map('map', '').setView([49.246125, -123.110662], 12);
+
+L.tileLayer('https://api.mapbox.com/styles/v1/elarapal/cj723dqbm19z42soogp3cilrt/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiZWxhcmFwYWwiLCJhIjoiY2lwYTVrYzJtMDAxb3Nubmp4NnNwMW95cyJ9.HiRwcboZw0UpnRUrwzxVAA', {
+    attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>'
+}).addTo(map);
+
+var geocoderControl = L.mapbox.geocoderControl('mapbox.places', 
+	{
+		keepOpen: false, 
+		position: 'topleft'
+	}
+).addTo(map);
+
+//Change the default message displayed to the user while their mouse is hovering above certain buttons.
+L.drawLocal.draw.toolbar.buttons.polygon = "Create New Boundary";
+L.drawLocal.edit.toolbar.buttons.edit = "Edit Existing Boundaries or Reference Points";
+L.drawLocal.edit.toolbar.buttons.remove = "Remove All Boundaries and Reference Points";
+L.drawLocal.draw.toolbar.buttons.marker = "Add Reference Point";
+
+var cirMarOpt = {			//Specify options for all Circle Markers
+    radius: 8,
+    fillColor: "#996633",
+    color: "#000",
+    weight: 1,
+    opacity: 1,
+    fillOpacity: 0.8
+};
+
+var featureGroup = L.featureGroup().addTo(map);	//Add empty layer group to map
+
+var drawControl = new L.Control.Draw({	//Create the draw toolbar with custom settings
+	draw : {
+        position : 'topleft',			//Keep the draw toolbar top-left of the screen
+        polyline : false,				//User cannot create polylines
+        rectangle : false,				//User cannot create rectanges
+        circle : false,					//User cannot create circles
+
+        polygon: {
+            allowIntersection: false, 	// Restricts shapes to simple polygons
+            drawError: {				// If the user attempts to draw a self intersection...
+                color: '#E10C30', 		// The polygon will change colors
+                message: 'Polygon cannot self-intersect!' //A message will be provided over the search cursor
+            },
+
+            shapeOptions: {
+                color: '#7B73EB'		//Specify the color the polygon
+            }
+        },
+	},
+    
+    edit: {								//Options specific to the EDIT toolbar (i.e., Edit & Delete)
+        featureGroup: featureGroup, 	//Allow the featureGroup layer group to be edited
+        remove: true					//Allow users to delete features from featureGroup
+    }
+});
+
+map.addControl(drawControl); 			//Add the customized draw toolbar to the map
+
+geocoderControl.on('found', function(geoOut) {
+	matchAddress = geoOut.results.features[0].place_name;
+	coordinates = geoOut.results.features[0].center;
+	coordinates = coordinates.toString(coordinates).split(",");
+ 	try {							
+	  	map.removeLayer(geocode)
+	} catch (e) {} 
+        
+    if (matchAddress.indexOf("Vancouver") !=-1) {
+	  	geocode = L.marker(new L.LatLng(coordinates[1], coordinates[0])).addTo(map);
+    }
+	else {
+	  	alert("'" + matchAddress + "', did not match any specific feature in Vancouver, British Columbia, Canada. Please retype the address and try again."); 
+	}
+});
+
+map.on('draw:created', function(e){		//Run the below code after a new feature has been drawn....
+    if (e.layerType === 'marker') {    			//If the created feature is Marker....
+        var marLat = e.layer.getLatLng().lat,	//Save the LATITUDE and LONGITUDE to different variables
+            marLng = e.layer.getLatLng().lng
+        var cirMar =  L.circleMarker([marLat,marLng], cirMarOpt) //Create a CircleMarker using the Marker lat/lng 
+        cirMar.addTo(featureGroup)								 //Add the CircleMarker to the map
+        }
+    else {										
+  		featureGroup.addLayer(e.layer);			//If not a Marker (i.e., Polygon) add directly to the map
+  	}       
+});
+
+document.getElementById('export').onclick = function(e){ //When The EXPORT button is clicked...
+
+	var polyOnly = L.featureGroup();	//Create new feature group for internal use
+
+	map.eachLayer(function(layer){			//For each layer added to the map...
+	    if (layer instanceof L.Polygon) {  	//...if the layer is a polygon...	
+	        polyOnly.addLayer(layer);		//...add it to the internal feature group (polyOnly)
+	    }
+	});
+
+    var geoJ = polyOnly.toGeoJSON();	// Create GeoJSON representation of all layers in PolyOnly
+	var geoJStr = JSON.stringify(geoJ);	// Convert GeoJSON representation to string
+
+	//Prepare data and download
+    document.getElementById('export').setAttribute('href', 'data:' + geoJStr);
+    document.getElementById('export').setAttribute('download','City_of_Vancouver_Boundary.geojson');
+
+    polyOnly = undefined; 	// Unset the internal FeatureGroup
+    delete(polyOnly); 		// Delete the variable
+};
+    
+document.getElementById('clear').onclick = function(e){
+
+	map.eachLayer(function(layer){
+	    if (layer instanceof L.CircleMarker) {    
+	        featureGroup.removeLayer(layer);
+	    }
+	});
+    //featureGroup.clearLayers(e.layer);
+};
+
+</script>
+</body>
+</html>
